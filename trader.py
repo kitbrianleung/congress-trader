@@ -18,6 +18,12 @@ dc = StockHistoricalDataClient(os.environ["ALPACA_KEY_ID"], os.environ["ALPACA_S
 TOKEN, CHANNEL = os.environ["DISCORD_BOT_TOKEN"], os.environ["DISCORD_CHANNEL_ID"]
 STATE_FILE = "state.json"
 
+# --- token structure diagnostic (prints NO secret characters) ---
+t = os.environ.get("DISCORD_BOT_TOKEN", "")
+print(f"token len={len(t)} dots={t.count('.')} "
+      f"alnum_ok={all(c.isalnum() or c in '._-' for c in t)} "
+      f"starts_MT={t.startswith('MT')}")
+
 def say(msg):
     for i in range(0, len(msg), 1900):
         payload = json.dumps({"content": msg[i:i+1900]}).encode()
