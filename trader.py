@@ -78,8 +78,17 @@ def poll_commands():
     return None
 
 def latest_price(ticker):
-    q = dc.get_stock_latest_quote(StockLatestQuoteRequest(symbol_or_symbols=ticker))[ticker]
-    return float(q.ask_price or q.bid_price)
+    try:
+        q = dc.get_stock_latest_quote(StockLatestQuoteRequest(symbol_or_symbols=ticker))[ticker]
+        px = float(q.ask_price or q.bid_price or 0)
+        if px > 0:
+            return px
+    except Exception:
+        pass
+    # pre-market fallback: yesterday's close
+    bar = dc.get_stock_bars(StockBarsRequest(
+        symbol_or_symbols=[ticker], timeframe=TimeFrame.Day, limit=2))[ticker][-1]
+    return float(bar.close)
 
 def passes_liquidity(ticker):
     try:
@@ -118,7 +127,7 @@ def run():
         return
 
     clock = tc.get_clock()
-    if not clock.is_open and (clock.next_open - clock.timestamp).total_seconds() > 6 * 3600:
+    if not clock.is_open and (clock.next_open - clock.timestamp).total_seconds() > 26 * 3600:
         say(f"ℹ️ **{today}** — market closed today; skipping.")
         return
     if st.get("last_run") == today:
