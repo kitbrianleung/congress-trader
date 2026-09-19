@@ -1,0 +1,27 @@
+name: daily-trade
+on:
+  schedule:
+    - cron: "30 13 * * 1-5"      # 13:30 UTC weekdays = 21:30 HKT ≈ US market open
+  workflow_dispatch: {}          # enables manual "Run workflow" button for testing
+permissions:
+  contents: read
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: state.json
+          key: congress-trader-state-${{ github.run_id }}
+          restore-keys: congress-trader-state-
+      - run: pip install alpaca-py pyyaml
+      - run: python trader.py
+        env:
+          ALPACA_KEY_ID: ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ vars.DISCORD_CHANNEL_ID }}
