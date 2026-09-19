@@ -18,11 +18,25 @@ dc = StockHistoricalDataClient(os.environ["ALPACA_KEY_ID"], os.environ["ALPACA_S
 TOKEN, CHANNEL = os.environ["DISCORD_BOT_TOKEN"], os.environ["DISCORD_CHANNEL_ID"]
 STATE_FILE = "state.json"
 
-# --- token structure diagnostic (prints NO secret characters) ---
-t = os.environ.get("DISCORD_BOT_TOKEN", "")
-print(f"token len={len(t)} dots={t.count('.')} "
-      f"alnum_ok={all(c.isalnum() or c in '._-' for c in t)} "
-      f"starts_MT={t.startswith('MT')}")
+# ============ TEMPORARY DIAGNOSTICS (delete after tests pass) ============
+# A: token structure check — prints NO secret characters, only shape
+_t = os.environ.get("DISCORD_BOT_TOKEN", "")
+print(f"token len={len(_t)} dots={_t.count('.')} "
+      f"alnum_ok={all(c.isalnum() or c in '._-' for c in _t)} "
+      f"starts_MT={_t.startswith('MT')}")
+
+# B: does Discord accept this token? (with proper User-Agent header)
+_req = urllib.request.Request(
+    "https://discord.com/api/v10/users/@me",
+    headers={"Authorization": f"Bot {_t}",
+             "User-Agent": "DiscordBot (https://github.com/congress-trader, 1.0.0)"})
+try:
+    _me = json.loads(urllib.request.urlopen(_req, timeout=30).read())
+    print("bot identity OK:", _me.get("username"), "id:", _me.get("id"))
+except urllib.error.HTTPError as e:
+    print("discord @me failed:", e.code, e.read().decode()[:200])
+    raise SystemExit(1)
+# ====================== END DIAGNOSTICS ===================================
 
 def say(msg):
     for i in range(0, len(msg), 1900):
@@ -84,16 +98,6 @@ def submit(side, ticker, qty, tag):
         client_order_id=f"{tag}-{ticker}-{datetime.now(timezone.utc):%Y%m%d}")
     tc.submit_order(order)
 
-# --- temporary diagnostic: what can this bot actually see? ---
-req = urllib.request.Request("https://discord.com/api/v10/users/@me",
-    headers={"Authorization": f"Bot {TOKEN}"})
-me = json.loads(urllib.request.urlopen(req, timeout=30).read())
-print("bot identity:", me.get("username"), "#", me.get("discriminator"), "id:", me.get("id"))
-req = urllib.request.Request("https://discord.com/api/v10/users/@me/guilds",
-    headers={"Authorization": f"Bot {TOKEN}"})
-guilds = json.loads(urllib.request.urlopen(req, timeout=30).read())
-print("bot is in guilds:", [(g["name"], g["id"]) for g in guilds])
-  
 def run():
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     st = load_state()
@@ -121,7 +125,6 @@ def run():
         say(f"ℹ️ **{today}** — already ran today; skipping.")
         return
 
-    # --- rebuild positions from broker if cache was lost ---
     broker_pos = {p.symbol: p for p in tc.get_all_positions()}
     for sym in broker_pos:
         st["positions"].setdefault(sym, {
@@ -133,10 +136,9 @@ def run():
     report = [f"📋 **Congressional Trader — {today}** (mode={CFG['mode']}, aggressive)",
               f"Equity ${equity:,.2f} | positions {len(broker_pos)}/{CFG['account']['max_positions']}"]
 
-    # --- exits ---
     signals, sell_tickers = fetch_signals(CFG)
     for sym, info in list(st["positions"].items()):
-        if sym not in broker_pos:            # position gone (manual close etc.)
+        if sym not in broker_pos:
             del st["positions"][sym]
             continue
         try:
@@ -163,7 +165,6 @@ def run():
             except Exception as e:
                 report.append(f"⚠️ SELL {sym} failed: {e}")
 
-    # --- entries (no market regime gate — aggressive profile) ---
     slots = CFG["account"]["max_positions"] - len(tc.get_all_positions())
     per_trade = equity * CFG["account"]["position_pct"]
     entered = 0
@@ -187,8 +188,7 @@ def run():
     if entered == 0:
         report.append("No new entries today.")
 
-    # --- reconciliation (the validator role) ---
-    actual = set(tc.get_all_positions()) and {p.symbol for p in tc.get_all_positions()}
+    actual = {p.symbol for p in tc.get_all_positions()}
     drift = actual.symmetric_difference(st["positions"].keys())
     if drift:
         report.append(f"⚠️ Reconcile drift: {', '.join(sorted(drift))} — investigate.")
