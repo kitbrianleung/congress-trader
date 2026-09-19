@@ -1,0 +1,21 @@
+mode: paper                      # flip to 'live' only after 60+ trading days of paper data
+account:
+  max_positions: 5
+  position_pct: 0.20             # 20% of equity per position
+
+universe:
+  excluded_tickers: [AAPL, MSFT, GOOGL, GOOG, AMZN, NVDA, META, TSLA]
+  min_price: 1.00                # sub-dollar = fraud filter, not conservatism
+  min_dollar_volume: 500000      # small caps welcome
+
+signal:
+  filing_window_days: 7
+  min_trade_value: 100000        # >= $100K estimated congressional trade
+  direction: buy                 # long-only
+
+exit:
+  max_holding_calendar_days: 85  # ~60 trading days
+  trailing_stop_pct: 0.25        # wide — small caps swing
+  exit_on_sell_filing: true      # the signal-based risk brake
+  # no take-profit: winners run until trailing stop / sell-filing / time stop
+  # no market regime gate: congressional dip-buying is the thesis
