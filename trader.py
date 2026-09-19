@@ -78,6 +78,16 @@ def submit(side, ticker, qty, tag):
         client_order_id=f"{tag}-{ticker}-{datetime.now(timezone.utc):%Y%m%d}")
     tc.submit_order(order)
 
+# --- temporary diagnostic: what can this bot actually see? ---
+req = urllib.request.Request("https://discord.com/api/v10/users/@me",
+    headers={"Authorization": f"Bot {TOKEN}"})
+me = json.loads(urllib.request.urlopen(req, timeout=30).read())
+print("bot identity:", me.get("username"), "#", me.get("discriminator"), "id:", me.get("id"))
+req = urllib.request.Request("https://discord.com/api/v10/users/@me/guilds",
+    headers={"Authorization": f"Bot {TOKEN}"})
+guilds = json.loads(urllib.request.urlopen(req, timeout=30).read())
+print("bot is in guilds:", [(g["name"], g["id"]) for g in guilds])
+  
 def run():
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     st = load_state()
