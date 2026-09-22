@@ -128,11 +128,15 @@ def run():
 
     clock = tc.get_clock()
     if not clock.is_open and (clock.next_open - clock.timestamp).total_seconds() > 26 * 3600:
+        # true skip (weekend/holiday): do NOT stamp last_run, so a later
+        # same-day manual run can still execute fully
         say(f"ℹ️ **{today}** — market closed today; skipping.")
         return
     if st.get("last_run") == today:
         say(f"ℹ️ **{today}** — already ran today; skipping.")
         return
+    st["last_run"] = today          # stamp BEFORE trading block, only on real runs
+    save_state(st)
 
     broker_pos = {p.symbol: p for p in tc.get_all_positions()}
     for sym in broker_pos:
