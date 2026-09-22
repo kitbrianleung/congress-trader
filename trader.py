@@ -68,20 +68,22 @@ def save_state(st):
     json.dump(st, open(STATE_FILE, "w"), indent=1)
 
 def poll_commands():
+    """Only responds to messages that are EXACTLY 'HALT', 'RESUME', or 'STATUS'
+    (nothing else in the message). Ignores all other channel chatter."""
     req = urllib.request.Request(
-        f"https://discord.com/api/v10/channels/{CHANNEL}/messages?limit=25",
+        f"https://discord.com/api/v10/channels/{CHANNEL}/messages?limit=50",
         headers={"Authorization": f"Bot {TOKEN}",
                  "User-Agent": "DiscordBot (https://github.com/congress-trader, 1.0.0)"})
     try:
         msgs = json.loads(urllib.request.urlopen(req, timeout=30).read())
     except Exception:
         return None
-    for m in msgs:
+    for m in msgs:  # newest first
         if m.get("author", {}).get("bot"):
-            continue
-        c = (m.get("content") or "").strip().upper()
-        if c in ("HALT", "RESUME", "STATUS"):
-            return c
+            continue                       # ignore bot messages (e.g., its own STATUS posts)
+        content = (m.get("content") or "").strip()
+        if content in ("HALT", "RESUME", "STATUS"):   # exact match only, not substring
+            return content
     return None
 
 def latest_price(ticker):
