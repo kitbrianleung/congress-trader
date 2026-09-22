@@ -47,9 +47,16 @@ def say(msg):
             headers={"Authorization": f"Bot {TOKEN}", "Content-Type": "application/json",
                      "User-Agent": "DiscordBot (https://github.com/congress-trader, 1.0.0)"})
         try:
-            urllib.request.urlopen(req, timeout=30).read()
+            resp = urllib.request.urlopen(req, timeout=30)
+            print(f"discord posted: {resp.status}")  # NEW: log success
+        except urllib.error.HTTPError as e:
+            body = e.read().decode()[:500]
+            print(f"discord send failed: HTTP {e.code} {body}", file=sys.stderr)
+            print(f"  channel={CHANNEL} token_prefix={TOKEN[:10]}...", file=sys.stderr)
+            raise  # NEW: crash so you see the error instead of silent skip
         except Exception as e:
-            print("discord send failed:", e, file=sys.stderr)
+            print(f"discord send failed: {e}", file=sys.stderr)
+            raise
         time.sleep(0.4)
 
 def load_state():
