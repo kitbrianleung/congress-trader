@@ -82,10 +82,21 @@ def normalize(o):
         "txId": o.get("_txId"),
     }
 
-def http_get(url):
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return r.read().decode("utf-8", "replace")
+def http_get(url, max_retries=3):
+    """Fetch with retry and backoff for rate limits."""
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                wait = 2 ** attempt * 5  # 5s, 10s, 20s
+                print(f"Rate limited (429), waiting {wait}s before retry {attempt+1}/{max_retries}")
+                time.sleep(wait)
+                continue
+            raise
+    raise Exception(f"Failed to fetch {url} after {max_retries} attempts")
 
 def scrape(tx_type):
     page, total, out, seen = 1, None, [], set()
@@ -101,7 +112,7 @@ def scrape(tx_type):
         if (total and page >= total) or page >= PAGE_CAP:
             break
         page += 1
-        time.sleep(0.5)
+        time.sleep(2.0)
     return out
 
 def days_old(date_str):
