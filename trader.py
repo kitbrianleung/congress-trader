@@ -158,7 +158,12 @@ def run():
     report = [f"📋 **Congressional Trader — {today}** (mode={CFG['mode']}, aggressive)",
               f"Equity ${equity:,.2f} | positions {len(broker_pos)}/{CFG['account']['max_positions']}"]
 
-    signals, sell_tickers = fetch_signals(CFG)
+    signals, sell_tickers, stats = fetch_signals(CFG)
+    rj = stats["rejected"]
+    report.append(f"Filings: {stats['buys_scanned']} buys / {stats['sells_scanned']} sells scanned "
+                  f"({CFG['signal']['filing_window_days']}d window) -> {stats['signals']} qualifying "
+                  f"(rejected: {rj['too_small']} too small, {rj['excluded']} Mag7, "
+                  f"{rj['too_old']} old, {rj['dupe']} dupe)")
     for sym, info in list(st["positions"].items()):
         if sym not in broker_pos:
             del st["positions"][sym]
@@ -208,7 +213,11 @@ def run():
         except Exception as e:
             report.append(f"⚠️ BUY {s['ticker']} failed: {e}")
     if entered == 0:
-        report.append("No new entries today.")
+        if stats["signals"] == 0:
+            report.append("No new entries today — no qualifying congressional filings in window.")
+        else:
+            report.append("No new entries — signals existed but failed liquidity/price checks or were already held. "
+                          "Top signals: " + "; ".join(stats["examples"]))
 
     actual = {p.symbol for p in tc.get_all_positions()}
     drift = actual.symmetric_difference(st["positions"].keys())
